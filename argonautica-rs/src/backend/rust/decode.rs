@@ -1,6 +1,6 @@
-use base64;
-
-use config::{Variant, Version};
+use crate::config::{Variant, Version};
+use crate::output::HashRaw;
+use crate::{Error, ErrorKind};
 use nom::{
     bytes::complete::{tag, take_until},
     character::complete::char,
@@ -8,10 +8,8 @@ use nom::{
     sequence::preceded,
     IResult,
 };
-use output::HashRaw;
-use {Error, ErrorKind};
 
-pub(crate) fn decode_rust(hash: &str) -> Result<HashRaw, Error> {
+pub fn decode_rust(hash: &str) -> Result<HashRaw, Error> {
     let (rest, intermediate) = parse_hash(hash).map_err(|_| {
         Error::new(ErrorKind::HashDecodeError).add_context(format!("Hash: {}", &hash))
     })?;
@@ -22,7 +20,7 @@ pub(crate) fn decode_rust(hash: &str) -> Result<HashRaw, Error> {
         iterations: intermediate.iterations,
         lanes: intermediate.lanes,
         memory_size: intermediate.memory_size,
-        raw_hash_bytes: raw_hash_bytes,
+        raw_hash_bytes,
         raw_salt_bytes: intermediate.raw_salt_bytes,
         variant: intermediate.variant,
         version: intermediate.version,
@@ -78,8 +76,8 @@ mod tests {
     use rand::{RngCore, SeedableRng};
 
     use super::*;
-    use backend::c::decode_c;
-    use hasher::Hasher;
+    use crate::backend::c::decode_c;
+    use crate::hasher::Hasher;
 
     #[test]
     fn test_decode() {
