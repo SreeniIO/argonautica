@@ -1,6 +1,13 @@
 use base64;
 
 use config::{Variant, Version};
+use nom::{
+    bytes::complete::{tag, take_until},
+    character::complete::char,
+    combinator::map_res,
+    sequence::preceded,
+    IResult,
+};
 use output::HashRaw;
 use {Error, ErrorKind};
 
@@ -32,39 +39,38 @@ struct IntermediateStruct {
     raw_salt_bytes: Vec<u8>,
 }
 
-#[cfg_attr(rustfmt, rustfmt_skip)]
-named!(parse_hash<&str, IntermediateStruct>, do_parse!(
-    take_until!("$") >>
-    take!(1) >>
-    variant: map_res!(take_until!("$"), |x: &str| x.parse::<Variant>()) >>
-    take_until!("$v=") >>
-    take!(3) >>
-    version: map_res!(take_until!("$"), |x: &str| x.parse::<Version>()) >>
-    take_until!("$m=") >>
-    take!(3) >>
-    memory_size: map_res!(take_until!(","), |x: &str| x.parse::<u32>()) >>
-    take_until!(",t=") >>
-    take!(3) >>
-    iterations: map_res!(take_until!(","), |x: &str| x.parse::<u32>()) >>
-    take_until!(",p=") >>
-    take!(3) >>
-    lanes: map_res!(take_until!("$"), |x: &str| x.parse::<u32>()) >>
-    take_until!("$") >>
-    take!(1) >>
-    raw_salt_bytes: map_res!(take_until!("$"), |x: &str| {
+fn parse_hash(input: &str) -> IResult<&str, IntermediateStruct> {
+    let (input, _) = take_until("$")(input)?;
+    let (input, _) = char('$')(input)?;
+    let (input, variant) = map_res(take_until("$"), |x: &str| x.parse::<Variant>())(input)?;
+    let (input, _) = preceded(take_until("$v="), tag("$v="))(input)?;
+    let (input, version) = map_res(take_until("$"), |x: &str| x.parse::<Version>())(input)?;
+    let (input, _) = preceded(take_until("$m="), tag("$m="))(input)?;
+    let (input, memory_size) = map_res(take_until(","), |x: &str| x.parse::<u32>())(input)?;
+    let (input, _) = preceded(take_until(",t="), tag(",t="))(input)?;
+    let (input, iterations) = map_res(take_until(","), |x: &str| x.parse::<u32>())(input)?;
+    let (input, _) = preceded(take_until(",p="), tag(",p="))(input)?;
+    let (input, lanes) = map_res(take_until("$"), |x: &str| x.parse::<u32>())(input)?;
+    let (input, _) = take_until("$")(input)?;
+    let (input, _) = char('$')(input)?;
+    let (input, raw_salt_bytes) = map_res(take_until("$"), |x: &str| {
         base64::decode_config(x, base64::STANDARD_NO_PAD)
-    }) >>
-    take_until!("$") >>
-    take!(1) >>
-    (IntermediateStruct {
-        iterations,
-        lanes,
-        memory_size,
-        raw_salt_bytes,
-        variant,
-        version,
-    })
-));
+    })(input)?;
+    let (input, _) = take_until("$")(input)?;
+    let (input, _) = char('$')(input)?;
+
+    Ok((
+        input,
+        IntermediateStruct {
+            iterations,
+            lanes,
+            memory_size,
+            raw_salt_bytes,
+            variant,
+            version,
+        },
+    ))
+}
 
 #[cfg(test)]
 mod tests {

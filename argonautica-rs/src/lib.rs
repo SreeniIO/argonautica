@@ -289,7 +289,6 @@ extern crate futures_cpupool;
 extern crate libc;
 #[macro_use]
 extern crate log;
-#[macro_use]
 extern crate nom;
 extern crate num_cpus;
 extern crate rand;
